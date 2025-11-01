@@ -57,6 +57,7 @@ typedef union
 	{
 		char passed1[21]; // KNUCKLES GOT    / CRAWLA HONCHO
 		char passed2[16]; // THROUGH THE ACT / PASSED THE ACT
+		char passed3[37]; // KNUCKLES GOT THROUGH THE ACT
 		INT32 passedx1;
 		INT32 passedx2;
 
@@ -451,6 +452,36 @@ void Y_IntermissionDrawer(void)
 	{
 		INT32 bonusy;
 
+		INT32 x, y, cnt, w;
+		INT32 xspan = (vid.width/vid.dup), yspan = (vid.height/vid.dup), diffy = (yspan - BASEVIDHEIGHT)/2, maxy = BASEVIDHEIGHT + diffy;
+		x = (((BASEVIDWIDTH-82)/2)+11)<<FRACBITS;
+		y = (((BASEVIDHEIGHT-82)/2)+12-10)<<FRACBITS;
+		cnt = (35 * (intertic % TICRATE)) / TICRATE;
+		w = (((8-cnt)*(8-cnt))<<(FRACBITS-5));
+		{
+			patch_t *fg = W_CachePatchName("RECATKFG", PU_PATCH);
+			INT32 height = fg->height / 2;
+			INT32 dup;
+
+			height = 18; // prevents the need for the next line
+			//dup = (w*height)/18;
+			dup = ((w>>FRACBITS) % height);
+			y = dup+(height/4);
+			x = 80+dup;
+			while (y >= -diffy)
+			{
+				x -= height;
+				y -= height;
+			}
+			while (y-dup < maxy && x < (xspan/2))
+			{
+				V_DrawFill((BASEVIDWIDTH/2)-x-height, -diffy, height, diffy+y+height, 153);
+				V_DrawFill((BASEVIDWIDTH/2)+x, (maxy-y)-height, height, height+y, 153);
+				y += height;
+				x += height;
+			}
+		}
+
 		if (gottoken) // first to be behind everything else
 			Y_IntermissionTokenDrawer();
 
@@ -482,34 +513,52 @@ void Y_IntermissionDrawer(void)
 					ST_DrawPadNumFromHud(HUD_TICS, tictrn, 2); // Tics
 				}
 			}
+
+			// draw rings
+			patch_t *sborings2 = W_CachePatchName("STTRINGS", PU_HUDGFX);
+			ST_DrawPatchFromHud(HUD_RINGS, sborings2);
+			if (cv_timetic.value == 2)
+				ST_DrawNumFromHud(HUD_RINGSNUMTICS, stplyr->rings);
+			else ST_DrawNumFromHud(HUD_RINGSNUM, stplyr->rings);
+
+			if (!modeattacking && LUA_HudEnabled(hud_lives))
+				ST_drawLivesArea();
 		}
+
+		int animx = intertic < 40 ? 1200 - (intertic * 30) : 0;
+		int animy = intertic < 60 ? 30 : intertic > 90 ? 0 : 30 - (intertic - 60);
+		int animx2 = intertic < 80 ? -4000 + (intertic * 100) : 2048;
 
 		if (LUA_HudEnabled(hud_intermissiontitletext))
 		{
 			// draw the "got through act" lines and act number
-			V_DrawLevelTitle(data.coop.passedx1, 49, 0, data.coop.passed1);
+			V_DrawLevelTitle(data.coop.passedx1 + animx, 49 + animy, 0, data.coop.passed1);
 			{
 				INT32 h = V_LevelNameHeight(data.coop.passed2);
-				V_DrawLevelTitle(data.coop.passedx2, 49+h+2, 0, data.coop.passed2);
+				V_DrawLevelTitle(data.coop.passedx2 + animx, 49+h+2+animy, 0, data.coop.passed2);
+				V_DrawFontString(animx2, h - 16, V_TRANSLUCENT|V_ALLOWLOWERCASE, 8*FRACUNIT, 8*FRACUNIT, data.coop.passed3, lt_font);
 
 				if (data.coop.actnum)
-					V_DrawLevelActNum(244, 42+h, 0, data.coop.actnum);
+					V_DrawLevelActNum(244 + animx, 42+h+animy, 0, data.coop.actnum);
 			}
 		}
 
+		animx = intertic < 132 ? 1980 - (intertic * 15) : 0;
+
 		bonusy = 150;
 		// Total
-		V_DrawScaledPatch(152, bonusy, 0, data.coop.ptotal);
-		V_DrawTallNum(BASEVIDWIDTH - 68, bonusy + 1, 0, data.coop.total);
+		V_DrawScaledPatch(152+animx, bonusy, 0, data.coop.ptotal);
+		V_DrawTallNum(BASEVIDWIDTH - 68+animx, bonusy + 1, 0, data.coop.total);
 		bonusy -= (3*(tallnum[0]->height)/2) + 1;
 
 		// Draw bonuses
 		for (i = 3; i >= 0; --i)
 		{
+			animx = intertic < 100 + (i * 8) ? 1500 + (i * 120) - (intertic * 15) : 0;
 			if (data.coop.bonuses[i].display)
 			{
-				V_DrawScaledPatch(152, bonusy, 0, data.coop.bonuspatches[i]);
-				V_DrawTallNum(BASEVIDWIDTH - 68, bonusy + 1, 0, data.coop.bonuses[i].points);
+				V_DrawScaledPatch(152+animx, bonusy, 0, data.coop.bonuspatches[i]);
+				V_DrawTallNum(BASEVIDWIDTH - 68+animx, bonusy + 1, 0, data.coop.bonuses[i].points);
 			}
 			bonusy -= (3*(tallnum[0]->height)/2) + 1;
 		}
@@ -1057,7 +1106,7 @@ void Y_Ticker(void)
 			tallydonetic = -1;
 		}
 
-		if (intertic < TICRATE) // one second pause before tally begins
+		if (intertic < TICRATE*4) // four second pause before tally begins
 			return;
 
 		for (i = 0; i < MAXPLAYERS; i++)
@@ -1088,7 +1137,7 @@ void Y_Ticker(void)
 		if (!anybonuses)
 		{
 			tallydonetic = intertic;
-			endtic = intertic + 3*TICRATE; // 3 second pause after end of tally
+			endtic = intertic + 2*TICRATE; // 2 second pause after end of tally
 			S_StartSound(NULL, (gottoken ? sfx_token : sfx_chchng)); // cha-ching!
 
 			// Update when done with tally
@@ -1401,6 +1450,8 @@ void Y_StartIntermission(void)
 						skins[players[consoleplayer].skin]->realname);
 					strcpy(data.coop.passed2, (mapheaderinfo[gamemap-1]->actnum) ? "through act" : "through the act");
 				}
+				snprintf(data.coop.passed3, sizeof data.coop.passed3, "%s got through the act",
+					skins[players[consoleplayer].skin]->realname);
 			}
 
 			// set X positions

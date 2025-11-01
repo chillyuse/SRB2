@@ -815,7 +815,7 @@ static inline void ST_drawRings(void)
 		ST_DrawNumFromHud(HUD_RINGSNUM, ringnum, V_PERPLAYER|((stplyr->spectator) ? V_HUDTRANSHALF : V_HUDTRANS));
 }
 
-static void ST_drawLivesArea(void)
+void ST_drawLivesArea(void)
 {
 	INT32 v_colmap = V_YELLOWMAP, livescount = -1;
 	boolean notgreyedout = false;
